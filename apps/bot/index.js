@@ -54,3 +54,13 @@ const respuesta = await procesarMensaje(telefono, texto, phoneNumberId)
 })
 
 app.listen(3001, () => console.log('Bot corriendo en puerto 3001'))
+import { enviarRecordatorios } from './recordatorios.js'
+
+// Cron job: corre cada día a las 8am
+setInterval(async () => {
+  const ahora = new Date()
+  if (ahora.getHours() === 8 && ahora.getMinutes() === 0) {
+    console.log('⏰ Ejecutando recordatorios...')
+    await enviarRecordatorios()
+  }
+}, 60000) // verifica cada minuto
