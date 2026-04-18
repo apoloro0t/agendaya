@@ -33,7 +33,8 @@ app.post('/webhook', async (req, res) => {
 
   console.log('Mensaje recibido de:', telefono, '→', texto)
 
-  const respuesta = await procesarMensaje(telefono, texto)
+  const phoneNumberId = change?.value?.metadata?.phone_number_id
+const respuesta = await procesarMensaje(telefono, texto, phoneNumberId)
 
   await fetch(`https://graph.facebook.com/v25.0/${PHONE_ID}/messages`, {
     method: 'POST',

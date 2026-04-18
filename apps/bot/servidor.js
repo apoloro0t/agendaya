@@ -7,20 +7,30 @@ const supabase = createClient(
 
 const SERVICIOS = {
   '1': 'Corte',
-  '2': 'Tinte', 
+  '2': 'Tinte',
   '3': 'Peinado',
   '4': 'Manicure'
 }
 
-const MENU = `Hola! Bienvenida a *Salón AgendaYa* 💅\n\nNuestros servicios:\n1️⃣ Corte - S/30\n2️⃣ Tinte - S/80\n3️⃣ Peinado - S/40\n4️⃣ Manicure - S/25\n\nEscribe *agendar* para reservar tu cita`
-
-export async function procesarMensaje(telefono, mensaje) {
+export async function procesarMensaje(telefono, mensaje, phoneNumberId) {
   const texto = mensaje.toLowerCase().trim()
-  
+
   console.log('📱 Telefono:', telefono)
   console.log('💬 Texto:', texto)
 
-  const { data: conv, error } = await supabase
+  // Buscar el salón por phone number ID
+  const { data: salon } = await supabase
+    .from('salones')
+    .select('*')
+    .eq('telefono_bot', phoneNumberId)
+    .maybeSingle()
+
+  const salonId = salon?.id || null
+  const salonNombre = salon?.nombre || 'Salón AgendaYa'
+
+  const MENU = `Hola! Bienvenida a *${salonNombre}* 💅\n\nNuestros servicios:\n1️⃣ Corte - S/30\n2️⃣ Tinte - S/80\n3️⃣ Peinado - S/40\n4️⃣ Manicure - S/25\n\nEscribe *agendar* para reservar tu cita`
+
+  const { data: conv } = await supabase
     .from('conversaciones')
     .select('*')
     .eq('telefono', telefono)
@@ -29,7 +39,6 @@ export async function procesarMensaje(telefono, mensaje) {
   const paso = conv?.paso || 'inicio'
   console.log('📍 Paso actual:', paso)
 
-  // Siempre responde al hola
   if (texto === 'hola' || texto === 'hi' || texto === 'buenas') {
     await supabase.from('conversaciones').upsert(
       { telefono, paso: 'inicio' },
@@ -38,7 +47,6 @@ export async function procesarMensaje(telefono, mensaje) {
     return MENU
   }
 
-  // Inicia el flujo de agenda
   if (texto === 'agendar') {
     await supabase.from('conversaciones').upsert(
       { telefono, paso: 'eligiendo_servicio' },
@@ -47,12 +55,9 @@ export async function procesarMensaje(telefono, mensaje) {
     return `¿Qué servicio quieres?\n\n1️⃣ Corte - S/30\n2️⃣ Tinte - S/80\n3️⃣ Peinado - S/40\n4️⃣ Manicure - S/25\n\nEscribe el número (1, 2, 3 o 4)`
   }
 
-  // Elige servicio
   if (paso === 'eligiendo_servicio') {
     const nombreServicio = SERVICIOS[texto]
-    if (!nombreServicio) {
-      return 'Por favor escribe 1, 2, 3 o 4 para elegir tu servicio'
-    }
+    if (!nombreServicio) return 'Por favor escribe 1, 2, 3 o 4 para elegir tu servicio'
 
     const { data: servicioDb } = await supabase
       .from('servicios')
@@ -69,12 +74,9 @@ export async function procesarMensaje(telefono, mensaje) {
     return `Elegiste *${servicioDb.nombre}* - S/${servicioDb.precio} ✅\n\n¿Qué día quieres tu cita?\nEscribe la fecha así: *2026-04-25*`
   }
 
-  // Elige fecha
   if (paso === 'eligiendo_fecha') {
     const fechaRegex = /^\d{4}-\d{2}-\d{2}$/
-    if (!fechaRegex.test(texto)) {
-      return 'Escribe la fecha así: *2026-04-25*'
-    }
+    if (!fechaRegex.test(texto)) return 'Escribe la fecha así: *2026-04-25*'
 
     await supabase.from('conversaciones').upsert(
       { telefono, paso: 'eligiendo_hora', fecha: texto },
@@ -83,28 +85,23 @@ export async function procesarMensaje(telefono, mensaje) {
     return `Fecha: *${texto}* ✅\n\n¿A qué hora quieres tu cita?\nEscribe la hora así: *10:00*`
   }
 
-  // Elige hora
   if (paso === 'eligiendo_hora') {
     const horaRegex = /^\d{2}:\d{2}$/
-    if (!horaRegex.test(texto)) {
-      return 'Escribe la hora así: *10:00*'
-    }
+    if (!horaRegex.test(texto)) return 'Escribe la hora así: *10:00*'
 
-    const { error: citaError } = await supabase.from('citas').insert({
+    await supabase.from('citas').insert({
       cliente_telefono: telefono,
       servicio_id: conv.servicio_id,
       fecha: conv.fecha,
       hora: texto,
-      estado: 'pendiente'
+      estado: 'pendiente',
+      salon_id: salonId
     })
-
-    if (citaError) return 'Error al guardar la cita. Escribe *agendar* para intentar de nuevo.'
 
     await supabase.from('conversaciones').delete().eq('telefono', telefono)
 
-    return `✅ *Cita confirmada!*\n\nFecha: ${conv.fecha}\nHora: ${texto}\n\nTe esperamos! 💅\n\nEscribe *hola* para ver nuestros servicios de nuevo.`
+    return `✅ *Cita confirmada!*\n\nFecha: ${conv.fecha}\nHora: ${texto}\n\nTe esperamos en *${salonNombre}*! 💅`
   }
 
-  // Respuesta por defecto
   return MENU
 }

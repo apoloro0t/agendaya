@@ -15,14 +15,25 @@ type Cita = {
 export default function Panel() {
   const [citas, setCitas] = useState<Cita[]>([])
   const [loading, setLoading] = useState(true)
+  const [salonNombre, setSalonNombre] = useState('')
   const hoy = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
     async function cargarCitas() {
+      const salonData = localStorage.getItem('salon')
+      if (!salonData) {
+        window.location.href = '/login'
+        return
+      }
+      const salon = JSON.parse(salonData)
+      setSalonNombre(salon.nombre)
+
       const { data } = await supabase
         .from('citas')
         .select('*, servicios(nombre, precio)')
+        .eq('salon_id', salon.id)
         .order('fecha', { ascending: true })
+
       if (data) setCitas(data)
       setLoading(false)
     }
@@ -38,6 +49,12 @@ export default function Panel() {
     setCitas(citas.map(c => c.id === id ? {...c, estado} : c))
   }
 
+  async function cerrarSesion() {
+    await supabase.auth.signOut()
+    localStorage.removeItem('salon')
+    window.location.href = '/login'
+  }
+
   const colorEstado: Record<string, string> = {
     pendiente: '#f59e0b',
     confirmada: '#10b981',
@@ -46,18 +63,28 @@ export default function Panel() {
 
   return (
     <main style={{fontFamily: "'Georgia', serif", background: '#faf7f4', minHeight: '100vh'}}>
-      
+
       {/* Header */}
       <div style={{background: 'white', borderBottom: '1px solid #ede8e3', padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
         <div>
           <h1 style={{fontSize: '22px', fontWeight: '700', color: '#1a1a1a', margin: 0}}>
             Agenda<span style={{color: '#f7426f'}}>Ya</span>
           </h1>
-          <p style={{color: '#a89a8a', fontSize: '12px', margin: '2px 0 0', fontFamily: 'monospace'}}>PANEL DE CITAS</p>
+          <p style={{color: '#a89a8a', fontSize: '12px', margin: '2px 0 0', fontFamily: 'monospace'}}>
+            {salonNombre || 'MI SALÓN'}
+          </p>
         </div>
-        <div style={{background: '#fff8f9', border: '1px solid #f7426f', borderRadius: '10px', padding: '8px 14px', textAlign: 'right'}}>
-          <p style={{color: '#f7426f', fontSize: '11px', margin: 0, fontFamily: 'monospace'}}>HOY</p>
-          <p style={{color: '#1a1a1a', fontSize: '18px', fontWeight: '700', margin: 0}}>S/{totalHoy}</p>
+        <div style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
+          <div style={{background: '#fff8f9', border: '1px solid #f7426f', borderRadius: '10px', padding: '8px 14px', textAlign: 'right'}}>
+            <p style={{color: '#f7426f', fontSize: '11px', margin: 0, fontFamily: 'monospace'}}>HOY</p>
+            <p style={{color: '#1a1a1a', fontSize: '18px', fontWeight: '700', margin: 0}}>S/{totalHoy}</p>
+          </div>
+          <button
+            onClick={cerrarSesion}
+            style={{background: 'none', border: '1px solid #ede8e3', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#a89a8a', cursor: 'pointer'}}
+          >
+            Salir
+          </button>
         </div>
       </div>
 
