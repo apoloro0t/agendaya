@@ -12,13 +12,33 @@ const SERVICIOS = {
   '4': 'Manicure'
 }
 
+async function verificarLimite(salonId, salon) {
+  if (!salonId) return { permitido: true }
+
+  const limites = {
+    'free': 15,
+    'basico': 50,
+    'premium': 999999
+  }
+
+  const limite = limites[salon?.plan] || 15
+
+  if ((salon?.citas_mes || 0) >= limite) {
+    return {
+      permitido: false,
+      mensaje: `Tu salón llegó al límite de *${limite} citas* del plan *${salon?.plan || 'free'}*.\n\nPara continuar agendando escribe a AgendaYa:\nwa.me/51999999999`
+    }
+  }
+
+  return { permitido: true }
+}
+
 export async function procesarMensaje(telefono, mensaje, phoneNumberId) {
   const texto = mensaje.toLowerCase().trim()
 
   console.log('📱 Telefono:', telefono)
   console.log('💬 Texto:', texto)
 
-  // Buscar el salón por phone number ID
   const { data: salon } = await supabase
     .from('salones')
     .select('*')
@@ -48,6 +68,9 @@ export async function procesarMensaje(telefono, mensaje, phoneNumberId) {
   }
 
   if (texto === 'agendar') {
+    const limite = await verificarLimite(salonId, salon)
+    if (!limite.permitido) return limite.mensaje
+
     await supabase.from('conversaciones').upsert(
       { telefono, paso: 'eligiendo_servicio' },
       { onConflict: 'telefono' }
@@ -89,7 +112,7 @@ export async function procesarMensaje(telefono, mensaje, phoneNumberId) {
     const horaRegex = /^\d{2}:\d{2}$/
     if (!horaRegex.test(texto)) return 'Escribe la hora así: *10:00*'
 
-    await supabase.from('citas').insert({
+    const { error: citaError } = await supabase.from('citas').insert({
       cliente_telefono: telefono,
       servicio_id: conv.servicio_id,
       fecha: conv.fecha,
@@ -97,6 +120,14 @@ export async function procesarMensaje(telefono, mensaje, phoneNumberId) {
       estado: 'pendiente',
       salon_id: salonId
     })
+
+    if (citaError) return 'Error al guardar la cita. Escribe *agendar* para intentar de nuevo.'
+
+    if (salonId) {
+      await supabase.from('salones')
+        .update({ citas_mes: (salon?.citas_mes || 0) + 1 })
+        .eq('id', salonId)
+    }
 
     await supabase.from('conversaciones').delete().eq('telefono', telefono)
 
