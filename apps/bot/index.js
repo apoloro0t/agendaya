@@ -19,7 +19,12 @@ const PHONE_ID       = process.env.WHATSAPP_PHONE_ID
 const APP_SECRET     = process.env.WHATSAPP_APP_SECRET
 
 if (!VERIFY_TOKEN || !WHATSAPP_TOKEN || !PHONE_ID || !APP_SECRET) {
-  console.error('Faltan variables de entorno requeridas. Revisa tu archivo .env')
+  console.error('Variables faltantes:', {
+    VERIFY_TOKEN: !!VERIFY_TOKEN,
+    WHATSAPP_TOKEN: !!WHATSAPP_TOKEN,
+    PHONE_ID: !!PHONE_ID,
+    APP_SECRET: !!APP_SECRET
+  })
   process.exit(1)
 }
 
