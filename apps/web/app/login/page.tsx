@@ -1,10 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 
 export default function Login() {
-  const router = useRouter()
   const [form, setForm] = useState({ email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -24,19 +22,20 @@ export default function Login() {
       return
     }
 
-    // Guardar datos del salón en localStorage
-    const { data: salon } = await supabase
+    const { data: salon, error: salonError } = await supabase
       .from('salones')
       .select('*')
       .eq('id', data.user.id)
       .single()
 
-    if (salon) {
-      localStorage.setItem('salon', JSON.stringify(salon))
+    if (salonError || !salon) {
+      setError('Error al cargar tu salón: ' + (salonError?.message || 'no encontrado'))
+      setLoading(false)
+      return
     }
 
-    router.push('/panel')
-    setLoading(false)
+    localStorage.setItem('salon', JSON.stringify(salon))
+    window.location.href = '/panel'
   }
 
   return (
