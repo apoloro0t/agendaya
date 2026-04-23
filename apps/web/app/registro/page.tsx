@@ -1,42 +1,60 @@
 'use client'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 
-export default function Login() {
-  const router = useRouter()
-  const [form, setForm] = useState({ email: '', password: '' })
+export default function Registro() {
+  const [form, setForm] = useState({
+    nombre: '',
+    email: '',
+    telefono_bot: '',
+    password: ''
+  })
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [mensaje, setMensaje] = useState('')
 
-  async function handleLogin() {
+  async function handleSubmit() {
     setLoading(true)
-    setError('')
+    setMensaje('')
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
+    if (!form.nombre || !form.email || !form.telefono_bot || !form.password) {
+      setMensaje('Completa todos los campos')
+      setLoading(false)
+      return
+    }
+
+    if (form.password.length < 6) {
+      setMensaje('La contraseña debe tener al menos 6 caracteres')
+      setLoading(false)
+      return
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
     })
 
     if (authError) {
-      setError('Email o contraseña incorrectos')
+      setMensaje('Error: ' + authError.message)
       setLoading(false)
       return
     }
 
-    // Guardar datos del salón en localStorage
-    const { data: salon } = await supabase
-      .from('salones')
-      .select('*')
-      .eq('id', data.user.id)
-      .single()
+    const { error: salonError } = await supabase.from('salones').insert({
+      id: authData.user?.id,
+      nombre: form.nombre,
+      email: form.email,
+      telefono_bot: form.telefono_bot,
+      plan: 'free',
+      activo: true
+    })
 
-    if (salon) {
-      localStorage.setItem('salon', JSON.stringify(salon))
+    if (salonError) {
+      setMensaje('Error al guardar: ' + salonError.message)
+      setLoading(false)
+      return
     }
 
-    router.push('/panel')
-    setLoading(false)
+    window.location.href = '/login'
   }
 
   return (
@@ -46,38 +64,50 @@ export default function Login() {
         <h1 style={{fontSize: '28px', fontWeight: '700', color: '#1a1a1a', margin: '0 0 4px'}}>
           Agenda<span style={{color: '#f7426f'}}>Ya</span>
         </h1>
-        <p style={{color: '#a89a8a', fontSize: '13px', margin: '0 0 32px', fontFamily: 'monospace'}}>INICIA SESIÓN</p>
+        <p style={{color: '#a89a8a', fontSize: '13px', margin: '0 0 32px', fontFamily: 'monospace'}}>CREA TU CUENTA</p>
 
-        <div style={{marginBottom: '16px'}}>
-          <label style={{color: '#7a6a5a', fontSize: '13px', display: 'block', marginBottom: '6px'}}>Correo electrónico</label>
-          <input type="email" placeholder="tu@email.com"
-            style={{width: '100%', border: '1px solid #ede8e3', borderRadius: '10px', padding: '12px 14px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', background: '#faf7f4'}}
-            value={form.email}
-            onChange={e => setForm({...form, email: e.target.value})}
-          />
+        <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+          <div>
+            <label style={{color: '#7a6a5a', fontSize: '13px', display: 'block', marginBottom: '6px'}}>Nombre del salón</label>
+            <input type="text" placeholder="Salón Valentina"
+              style={{width: '100%', border: '1px solid #ede8e3', borderRadius: '10px', padding: '12px 14px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', background: '#faf7f4'}}
+              value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})}
+            />
+          </div>
+          <div>
+            <label style={{color: '#7a6a5a', fontSize: '13px', display: 'block', marginBottom: '6px'}}>Correo electrónico</label>
+            <input type="email" placeholder="tu@email.com"
+              style={{width: '100%', border: '1px solid #ede8e3', borderRadius: '10px', padding: '12px 14px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', background: '#faf7f4'}}
+              value={form.email} onChange={e => setForm({...form, email: e.target.value})}
+            />
+          </div>
+          <div>
+            <label style={{color: '#7a6a5a', fontSize: '13px', display: 'block', marginBottom: '6px'}}>Tu número de WhatsApp</label>
+            <input type="text" placeholder="+51999999999"
+              style={{width: '100%', border: '1px solid #ede8e3', borderRadius: '10px', padding: '12px 14px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', background: '#faf7f4'}}
+              value={form.telefono_bot} onChange={e => setForm({...form, telefono_bot: e.target.value})}
+            />
+          </div>
+          <div>
+            <label style={{color: '#7a6a5a', fontSize: '13px', display: 'block', marginBottom: '6px'}}>Contraseña</label>
+            <input type="password" placeholder="Mínimo 6 caracteres"
+              style={{width: '100%', border: '1px solid #ede8e3', borderRadius: '10px', padding: '12px 14px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', background: '#faf7f4'}}
+              value={form.password} onChange={e => setForm({...form, password: e.target.value})}
+            />
+          </div>
+
+          {mensaje && <p style={{color: '#ef4444', fontSize: '13px', margin: 0}}>{mensaje}</p>}
+
+          <button onClick={handleSubmit} disabled={loading}
+            style={{background: '#f7426f', color: 'white', border: 'none', padding: '14px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', marginTop: '8px'}}>
+            {loading ? 'Creando cuenta...' : 'Crear cuenta gratis →'}
+          </button>
+
+          <p style={{textAlign: 'center', color: '#a89a8a', fontSize: '13px', margin: 0}}>
+            ¿Ya tienes cuenta?{' '}
+            <a href="/login" style={{color: '#f7426f', textDecoration: 'none', fontWeight: '600'}}>Inicia sesión</a>
+          </p>
         </div>
-
-        <div style={{marginBottom: '24px'}}>
-          <label style={{color: '#7a6a5a', fontSize: '13px', display: 'block', marginBottom: '6px'}}>Contraseña</label>
-          <input type="password" placeholder="••••••••"
-            style={{width: '100%', border: '1px solid #ede8e3', borderRadius: '10px', padding: '12px 14px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', background: '#faf7f4'}}
-            value={form.password}
-            onChange={e => setForm({...form, password: e.target.value})}
-          />
-        </div>
-
-        {error && <p style={{color: '#ef4444', fontSize: '13px', marginBottom: '16px'}}>{error}</p>}
-
-        <button onClick={handleLogin} disabled={loading}
-          style={{width: '100%', background: '#f7426f', color: 'white', border: 'none', padding: '14px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', cursor: 'pointer'}}>
-          {loading ? 'Entrando...' : 'Entrar →'}
-        </button>
-
-        <p style={{textAlign: 'center', color: '#a89a8a', fontSize: '13px', marginTop: '20px'}}>
-          ¿No tienes cuenta?{' '}
-          <a href="/registro" style={{color: '#f7426f', textDecoration: 'none', fontWeight: '600'}}>Regístrate gratis</a>
-        </p>
-
       </div>
     </main>
   )
